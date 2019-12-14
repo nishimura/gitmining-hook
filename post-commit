@@ -1,0 +1,25 @@
+#!/bin/bash
+
+#
+# commit hash mining tool
+#
+
+(git log -1 --pretty=format:'%B' | grep 'gitmining-salt:' --quiet) && exit 0
+
+SECONDS=0
+
+SHA=$(git rev-parse HEAD)
+
+while [ ${SHA:0:2} != "00" ]; do
+    if [ $(git log -1 --pretty=format:'%B' | wc -l) = "1" ]; then
+        git commit --quiet --no-verify --allow-empty --amend -m "$(git log -1 --pretty=format:'%B' && echo && echo && echo gitmining-salt:)"
+    fi
+    git log -1 --pretty=format:'%B' | grep 'gitmining-salt:' --quiet
+    N=$((1!=$?))
+    git commit --quiet --no-verify --allow-empty --amend -m "$(git log -1 --pretty=format:'%B' | head -n -${N} && (echo -n 'gitmining-salt: ' && cat /dev/urandom | tr -dc "[:graph:]" | head -c 32))"
+    SHA=$(git rev-parse HEAD)
+    echo $SHA
+done
+
+echo "done ${SECONDS}s."
+
