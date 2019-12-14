@@ -4,22 +4,42 @@
 # commit hash mining tool
 #
 
-(git log -1 --pretty=format:'%B' | grep 'gitmining-salt:' --quiet) && exit 0
+SHA=$(git rev-parse HEAD)
+
+if [ ${SHA:0:2} = "00" ]; then
+    exit 0
+fi
+
+# (git log -1 --pretty=format:'%B' | grep 'gitmining-salt:' --quiet) && exit 0
 
 SECONDS=0
 
-SHA=$(git rev-parse HEAD)
+RAW=$(git cat-file -p HEAD)
+MSG=$(git log -1 --pretty=format:'%B')
+MLEN=$(echo -n "$MSG" | wc -c)
+TREE=$(echo -n "$RAW" | head -c -$MLEN)
+#MSG="commit ${LEN}\0${MSG}"
 
 while [ ${SHA:0:2} != "00" ]; do
-    if [ $(git log -1 --pretty=format:'%B' | wc -l) = "1" ]; then
-        git commit --quiet --no-verify --allow-empty --amend -m "$(git log -1 --pretty=format:'%B' && echo && echo && echo gitmining-salt:)"
+    if [ $(echo "$MSG" | wc -l) = "1" ]; then
+        MSG=$(echo "${MSG}" && echo && echo -n 'ngitminging-salt: ')
     fi
-    git log -1 --pretty=format:'%B' | grep 'gitmining-salt:' --quiet
+    echo "$MSG" | grep 'gitmining-salt:' --quiet
     N=$((1!=$?))
-    git commit --quiet --no-verify --allow-empty --amend -m "$(git log -1 --pretty=format:'%B' | head -n -${N} && (echo -n 'gitmining-salt: ' && cat /dev/urandom | tr -dc "[:graph:]" | head -c 32))"
-    SHA=$(git rev-parse HEAD)
+    MSG=$(echo "$MSG" | head -n -$N && (echo -n 'gitmining-salt: ' && cat /dev/urandom | tr -dc "[:graph:]" | head -c 32))
+    D=$(date +%s)
+    TREE=$(echo "$TREE" | sed -e "s/\(committer[^<]*<[^>]*>\) [0-9]* \(.*\)/\1 ${D} \2/g")
+    DATA=$(echo -e "${TREE}\n\n${MSG}")
+    LEN=$(echo "$DATA" | wc -c)
+    SHA=$(echo -e "commit ${LEN}\0${DATA}" | sha1sum)
+    # echo " -- "
+    # echo -e "[commit ${LEN}\0${DATA}]"
+    # echo "${DATA}" > tmp.txt
     echo $SHA
 done
 
+git commit --quiet --no-verify --allow-empty --amend -m "$MSG"
+
+echo "  ---  "
 echo "done ${SECONDS}s."
 
